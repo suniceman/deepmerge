@@ -85,24 +85,30 @@ function deepmerge(target, source, options) {
 			cloneUnlessOtherwiseSpecified: cloneUnlessOtherwiseSpecified,
 		})
 	}
-	// Inherit caller options so non-enumerable and inherited settings still work.
-	options = Object.create(options)
-	Object.defineProperties(options, {
-		arrayMerge: {
-			value: options.arrayMerge || defaultArrayMerge,
-			writable: true, enumerable: true, configurable: true,
-		},
-		isMergeableObject: {
-			value: options.isMergeableObject || defaultIsMergeableObject,
-			writable: true, enumerable: true, configurable: true,
-		},
-		// Custom arrayMerge() implementations can use this helper, but the caller
-		// may not replace it.
-		cloneUnlessOtherwiseSpecified: {
-			value: cloneUnlessOtherwiseSpecified,
-			writable: true, enumerable: true, configurable: true,
-		},
+	// Preserve own properties so custom merge functions can copy their options.
+	var descriptors = Object.create(null)
+	var keys = Object.getOwnPropertyNames(options)
+	if (Object.getOwnPropertySymbols) {
+		keys = keys.concat(Object.getOwnPropertySymbols(options))
+	}
+	keys.forEach(function(key) {
+		descriptors[key] = Object.getOwnPropertyDescriptor(options, key)
 	})
+	descriptors.arrayMerge = {
+		value: options.arrayMerge || defaultArrayMerge,
+		writable: true, enumerable: true, configurable: true,
+	}
+	descriptors.isMergeableObject = {
+		value: options.isMergeableObject || defaultIsMergeableObject,
+		writable: true, enumerable: true, configurable: true,
+	}
+	// Custom arrayMerge() implementations can use this helper, but the caller
+	// may not replace it.
+	descriptors.cloneUnlessOtherwiseSpecified = {
+		value: cloneUnlessOtherwiseSpecified,
+		writable: true, enumerable: true, configurable: true,
+	}
+	options = Object.create(Object.getPrototypeOf(options), descriptors)
 	return merge(target, source, options)
 }
 

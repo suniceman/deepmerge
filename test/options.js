@@ -127,3 +127,65 @@ test('the public clone helper resolves defaults for modified options', function(
 	t.notEqual(actual[0][0], source[0][0])
 	t.end()
 })
+
+test('callbacks can copy the clone option before using the public helper', function(t) {
+	var source = [{ value: 1 }]
+	var actual = merge([], source, {
+		clone: false,
+		arrayMerge: function(target, source, options) {
+			var cloneOptions = {}
+			Object.keys(options).forEach(function(key) {
+				cloneOptions[key] = options[key]
+			})
+			cloneOptions.arrayMerge = undefined
+			return options.cloneUnlessOtherwiseSpecified(source, cloneOptions)
+		},
+	})
+
+	t.equal(actual, source)
+	t.end()
+})
+
+test('callbacks can copy custom merge configuration before merging', function(t) {
+	var actual = merge([{ child: {} }], [{ child: {} }], {
+		customValue: 'merged',
+		customMerge: function(key) {
+			if (key === 'child') {
+				return function(target, source, options) {
+					return options.customValue
+				}
+			}
+		},
+		arrayMerge: function(target, source, options) {
+			var mergeOptions = {}
+			Object.keys(options).forEach(function(key) {
+				mergeOptions[key] = options[key]
+			})
+			return merge(target[0], source[0], mergeOptions)
+		},
+	})
+
+	t.deepEqual(actual, { child: 'merged' })
+	t.end()
+})
+
+test('preserves own custom option descriptors and the original prototype', function(t) {
+	var symbol = Symbol('custom option')
+	var prototype = { inherited: 'inherited option' }
+	var options = Object.create(prototype)
+	Object.defineProperty(options, 'hidden', { value: 'hidden option' })
+	Object.defineProperty(options, symbol, { value: 'symbol option' })
+	Object.defineProperty(options, '__proto__', { value: 'literal option' })
+	options.arrayMerge = function(target, source, mergeOptions) {
+		t.equal(Object.getPrototypeOf(mergeOptions), prototype)
+		var keys = ['hidden', symbol, '__proto__']
+		keys.forEach(function(key) {
+			t.deepEqual(Object.getOwnPropertyDescriptor(mergeOptions, key),
+				Object.getOwnPropertyDescriptor(options, key))
+		})
+		return source
+	}
+
+	merge([], [], Object.freeze(options))
+	t.end()
+})
